@@ -16,6 +16,7 @@ import { CATEGORIES } from '@/types';
 
 export function Navbar() {
   const { cartCount } = useStore();
+  const { currentUser, logout, admin } = useStore();
   const { path, navigate } = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -85,12 +86,17 @@ export function Navbar() {
             {navLink('/products', 'Products')}
             {navLink('/categories', 'Categories')}
             {navLink('/orders', 'My Orders')}
-            {navLink('/admin', 'Admin')}
+            {!currentUser && navLink('/login', 'Login')}
+            {!currentUser && navLink('/register', 'Register')}
+            {currentUser && (
+              <button onClick={() => logout()} className="text-sm font-medium text-ink-600 hover:text-ink-900">Logout</button>
+            )}
+            {admin && navLink('/admin', 'Admin')}
           </nav>
 
           <div className="ml-auto flex items-center gap-1 lg:ml-2">
             <Link
-              to="/orders"
+              to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900"
               aria-label="Cart"
             >
@@ -102,7 +108,7 @@ export function Navbar() {
               )}
             </Link>
             <Link
-              to="/orders"
+              to="/profile"
               className="hidden h-10 w-10 items-center justify-center rounded-lg text-ink-600 hover:bg-ink-100 hover:text-ink-900 sm:flex"
               aria-label="Account"
             >
@@ -142,9 +148,15 @@ export function Navbar() {
             <Link to="/orders" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50">
               <Package size={16} /> My Orders
             </Link>
-            <Link to="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50">
-              <ShieldCheck size={16} /> Admin Dashboard
-            </Link>
+            {admin ? (
+              <Link to="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50">
+                <ShieldCheck size={16} /> Admin Dashboard
+              </Link>
+            ) : (
+              <Link to="/admin/login" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50">
+                <ShieldCheck size={16} /> Admin
+              </Link>
+            )}
             <div className="mt-2 border-t border-ink-100 pt-2">
               <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">Categories</p>
               {CATEGORIES.map((c) => (

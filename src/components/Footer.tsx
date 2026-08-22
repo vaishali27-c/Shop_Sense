@@ -6,7 +6,7 @@ export function Footer() {
   return (
     <footer className="mt-16 border-t border-ink-100 bg-white">
       <div className="container-app py-12">
-        <div className="grid gap-8 md:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-5">
           <div>
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
@@ -18,6 +18,7 @@ export function Footer() {
               AI-assisted shopping and inventory management. A college project prototype built with demo data.
             </p>
           </div>
+
           <div>
             <h4 className="text-sm font-semibold text-ink-800">Shop</h4>
             <ul className="mt-3 space-y-2 text-sm text-ink-500">
@@ -30,14 +31,22 @@ export function Footer() {
               ))}
             </ul>
           </div>
+
           <div>
             <h4 className="text-sm font-semibold text-ink-800">Account</h4>
             <ul className="mt-3 space-y-2 text-sm text-ink-500">
               <li><Link to="/orders" className="hover:text-brand-700">My Orders</Link></li>
               <li><Link to="/cart" className="hover:text-brand-700">Cart</Link></li>
-              <li><Link to="/admin" className="hover:text-brand-700">Admin Dashboard</Link></li>
             </ul>
           </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-ink-800">For Staff</h4>
+            <ul className="mt-3 space-y-2 text-sm text-ink-500">
+              <li><Link to="/admin/login" className="hover:text-brand-700">Admin Login</Link></li>
+            </ul>
+          </div>
+
           <div>
             <h4 className="text-sm font-semibold text-ink-800">Contact</h4>
             <ul className="mt-3 space-y-2 text-sm text-ink-500">

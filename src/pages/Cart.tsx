@@ -5,7 +5,7 @@ import { formatINR } from '@/lib/inventory';
 import { EmptyState } from '@/components/ui/EmptyState';
 
 export function Cart() {
-  const { cart, products, updateCartQty, removeFromCart } = useStore();
+  const { cart, products, updateCartQty, removeFromCart, clearCart, cartMessage } = useStore();
   const { navigate } = useRouter();
 
   const items = cart
@@ -15,6 +15,7 @@ export function Cart() {
     })
     .filter(Boolean) as { product: NonNullable<ReturnType<typeof products.find>>; quantity: number }[];
 
+  const quantityCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((s, i) => s + i.product.price * i.quantity, 0);
   const deliveryCharge = subtotal === 0 || subtotal > 999 ? 0 : 49;
   const total = subtotal + deliveryCharge;
@@ -42,6 +43,23 @@ export function Cart() {
       <h1 className="mb-6 text-2xl font-bold text-ink-900">Shopping Cart</h1>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
+          {cartMessage && (
+            <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm text-brand-700">
+              {cartMessage}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-ink-500">{quantityCount} item(s) selected</p>
+            </div>
+            <button
+              onClick={clearCart}
+              className="btn-ghost text-sm px-3 py-2"
+              disabled={items.length === 0}
+            >
+              Clear Cart
+            </button>
+          </div>
           {items.map(({ product, quantity }) => (
             <div key={product.id} className="card flex gap-4 p-4">
               <Link to={`/product/${product.id}`} className="flex-shrink-0">
@@ -98,7 +116,7 @@ export function Cart() {
             <h2 className="text-base font-semibold text-ink-900">Order Summary</h2>
             <div className="mt-4 space-y-2.5 text-sm">
               <div className="flex justify-between">
-                <span className="text-ink-500">Subtotal ({items.length} items)</span>
+                <span className="text-ink-500">Subtotal ({quantityCount} item(s))</span>
                 <span className="font-medium text-ink-800">{formatINR(subtotal)}</span>
               </div>
               <div className="flex justify-between">

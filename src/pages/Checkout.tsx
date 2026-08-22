@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, CreditCard, Banknote, Wallet, ArrowLeft } from 'lucide-react';
 import { useStore } from '@/store/StoreContext';
 import { Link, useRouter } from '@/lib/router';
 import { formatINR } from '@/lib/inventory';
-import type { Order } from '@/types';
+import { getProducts } from '@/services/api';
+import type { Order, PaymentMethod } from '@/types';
 
 export function Checkout() {
-  const { cart, products, placeOrder } = useStore();
+  const { cart, products, placeOrder, currentUser } = useStore();
   const { navigate } = useRouter();
 
   const items = cart
@@ -20,7 +21,15 @@ export function Checkout() {
   const deliveryCharge = subtotal === 0 || subtotal > 999 ? 0 : 49;
   const total = subtotal + deliveryCharge;
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    customerName: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    pincode: string;
+    paymentMethod: PaymentMethod;
+  }>({
     customerName: '',
     email: '',
     phone: '',
@@ -31,6 +40,65 @@ export function Checkout() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function validateCart() {
+      if (cart.length === 0) {
+        setValidationError(null);
+        setIsValidating(false);
+        return;
+      }
+
+      setIsValidating(true);
+      setValidationError(null);
+
+      try {
+        const backendProducts = await getProducts();
+        let message: string | null = null;
+
+        for (const cartItem of cart) {
+          const product = backendProducts.find((p) => p.id === cartItem.productId);
+          if (!product) {
+            message = 'Some products in your cart are no longer available.';
+            break;
+          }
+          if (cartItem.quantity > product.stock) {
+            message = `Only ${product.stock} unit(s) of ${product.name} are available.`;
+            break;
+          }
+        }
+
+        if (!cancelled) {
+          setValidationError(message);
+        }
+      } catch {
+        if (!cancelled) {
+          setValidationError('Unable to validate cart availability. Please try again.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsValidating(false);
+        }
+      }
+    }
+
+    validateCart();
+    return () => {
+      cancelled = true;
+    };
+  }, [cart]);
+
+  useEffect(() => {
+    if (!placed) return;
+    const timer = window.setTimeout(() => navigate('/orders'), 2800);
+    return () => window.clearTimeout(timer);
+  }, [placed, navigate]);
 
   const update = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -49,12 +117,30 @@ export function Checkout() {
     return Object.keys(e).length === 0;
   };
 
-  const submit = (ev: React.FormEvent) => {
+  const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    if (!validate()) return;
-    const order = placeOrder(form);
-    setPlaced(order);
-    window.scrollTo({ top: 0 });
+    if (isSubmitting || !validate() || Boolean(validationError)) return;
+
+    if (!currentUser) {
+      // prompt login
+      navigate(`/login?return=/checkout`);
+      return;
+    }
+
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      const order = await placeOrder(form);
+      setPlaced(order);
+      window.scrollTo({ top: 0 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Your order could not be placed.';
+      console.error('[Checkout] PlaceOrder API failure:', error);
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (placed) {
@@ -119,6 +205,11 @@ export function Checkout() {
       </Link>
       <h1 className="mb-6 text-2xl font-bold text-ink-900">Checkout</h1>
       <form onSubmit={submit} className="grid gap-6 lg:grid-cols-3">
+        {(submitError || validationError) && (
+          <div className="lg:col-span-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError || validationError}
+          </div>
+        )}
         <div className="space-y-6 lg:col-span-2">
           <div className="card p-6">
             <h2 className="mb-4 text-base font-semibold text-ink-900">Customer Information</h2>
@@ -193,6 +284,12 @@ export function Checkout() {
           <div className="card sticky top-20 p-5">
             <h2 className="text-base font-semibold text-ink-900">Order Summary</h2>
             <div className="mt-4 max-h-64 space-y-3 overflow-y-auto">
+              {isValidating ? (
+                <p className="text-sm text-ink-500">Validating cart against current stock...</p>
+              ) : null}
+              {!isValidating && items.length === 0 ? (
+                <p className="text-sm text-ink-500">Your cart is currently empty or contains unavailable products.</p>
+              ) : null}
               {items.map(({ product, quantity }) => (
                 <div key={product.id} className="flex items-center gap-3 text-sm">
                   <img src={product.image} alt={product.name} className="h-12 w-12 rounded-md object-cover" />
@@ -209,7 +306,19 @@ export function Checkout() {
               <div className="flex justify-between"><span className="text-ink-500">Delivery</span><span>{deliveryCharge === 0 ? 'FREE' : formatINR(deliveryCharge)}</span></div>
               <div className="flex justify-between border-t border-ink-100 pt-2 text-base font-bold"><span>Total</span><span className="text-brand-700">{formatINR(total)}</span></div>
             </div>
-            <button type="submit" className="btn-primary mt-5 w-full py-3">Place Order</button>
+            {currentUser ? (
+              <button type="submit" disabled={isSubmitting || Boolean(validationError)} className="btn-primary mt-5 w-full py-3 disabled:opacity-60">
+                {isSubmitting ? 'Placing Order...' : 'Place Order'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(`/login?return=/checkout`)}
+                className="btn-primary mt-5 w-full py-3"
+              >
+                Login to Place Order
+              </button>
+            )}
           </div>
         </div>
       </form>

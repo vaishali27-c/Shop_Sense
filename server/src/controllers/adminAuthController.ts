@@ -1,0 +1,65 @@
+import type { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { AdminModel } from '../models/Admin';
+
+const ADMIN_SECRET = process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+export async function adminLogin(req: Request, res: Response): Promise<void> {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ message: 'Missing email or password' });
+    return;
+  }
+
+  // basic validation
+  const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  if (!emailRegex.test(email)) {
+    res.status(400).json({ message: 'Invalid email' });
+    return;
+  }
+
+  const admin = await AdminModel.findOne({ email });
+  if (!admin) {
+    res.status(401).json({ message: 'Invalid admin credentials.' });
+    return;
+  }
+
+  const ok = await bcrypt.compare(password, admin.passwordHash);
+  if (!ok) {
+    res.status(401).json({ message: 'Invalid admin credentials.' });
+    return;
+  }
+
+  const token = jwt.sign({ id: admin._id.toString(), email: admin.email }, ADMIN_SECRET, { expiresIn: '7d' });
+  res.cookie('shopsense_admin', token, COOKIE_OPTIONS);
+
+  res.json({ id: admin._id.toString(), email: admin.email, name: admin.name });
+}
+
+export async function adminMe(req: Request, res: Response): Promise<void> {
+  const adminReq = (req as any).admin;
+  if (!adminReq) {
+    res.status(401).json({ message: 'Unauthorized' });
+    return;
+  }
+
+  const found = await AdminModel.findById(adminReq.id).select('-passwordHash');
+  if (!found) {
+    res.status(404).json({ message: 'Admin not found' });
+    return;
+  }
+
+  res.json({ id: found._id.toString(), email: found.email, name: found.name });
+}
+
+export async function adminLogout(req: Request, res: Response): Promise<void> {
+  res.clearCookie('shopsense_admin');
+  res.status(204).send();
+}

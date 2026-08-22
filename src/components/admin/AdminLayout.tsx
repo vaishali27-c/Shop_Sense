@@ -12,6 +12,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Link, useRouter } from '@/lib/router';
+import { useStore } from '@/store/StoreContext';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const NAV = [
   { to: '/admin/inventory', label: 'Inventory', icon: Boxes },
   { to: '/admin/orders', label: 'Orders', icon: ClipboardList },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/admin/content-intelligence', label: 'Content Intelligence', icon: Sparkles },
 ];
 
 export function AdminLayout({
@@ -32,6 +34,7 @@ export function AdminLayout({
 }) {
   const { path } = useRouter();
   const [open, setOpen] = useState(false);
+  const { admin, adminLogout } = useStore();
 
   return (
     <div className="min-h-screen bg-ink-50">
@@ -95,6 +98,15 @@ export function AdminLayout({
             <h1 className="text-lg font-bold text-ink-900">{title}</h1>
             <div className="ml-auto flex items-center gap-3">
               {action}
+              {admin && (
+                <div className="flex items-center gap-3">
+                  <div className="hidden flex-col text-right text-xs sm:flex">
+                    <span className="font-medium text-ink-800">{admin.name ?? 'Admin'}</span>
+                    <span className="text-ink-500">{admin.email}</span>
+                  </div>
+                  <button onClick={() => adminLogout()} className="text-sm text-ink-600">Logout</button>
+                </div>
+              )}
               <span className="hidden items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 sm:flex">
                 <Sparkles size={12} /> Admin Mode
               </span>

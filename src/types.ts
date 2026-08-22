@@ -37,6 +37,8 @@ export interface CartItem {
   quantity: number;
 }
 
+export type PaymentMethod = 'Cash on Delivery' | 'Credit / Debit Card' | 'UPI / Wallet';
+
 export type OrderStatus = 'Placed' | 'Confirmed' | 'Shipped' | 'Delivered';
 
 export interface OrderItem {
@@ -59,7 +61,7 @@ export interface Order {
   address: string;
   city: string;
   pincode: string;
-  paymentMethod: string;
+  paymentMethod: PaymentMethod;
   status: OrderStatus;
   createdAt: string;
 }

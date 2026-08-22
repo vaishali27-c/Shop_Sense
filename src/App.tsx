@@ -1,5 +1,5 @@
 import { RouterProvider, useRouter } from '@/lib/router';
-import { StoreProvider } from '@/store/StoreContext';
+import { StoreProvider, useStore } from '@/store/StoreContext';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { ShoppingAssistant } from '@/components/ShoppingAssistant';
@@ -15,17 +15,35 @@ import { ProductManagement } from '@/pages/admin/ProductManagement';
 import { InventoryManagement } from '@/pages/admin/InventoryManagement';
 import { OrderManagement } from '@/pages/admin/OrderManagement';
 import { SalesAnalytics } from '@/pages/admin/SalesAnalytics';
+import ContentIntelligence from '@/pages/admin/ContentIntelligence';
+import ContentPageDetails from '@/pages/admin/ContentPageDetails';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import Profile from '@/pages/Profile';
+import AdminLogin from '@/pages/admin/AdminLogin';
 
 function Routes() {
   const { path } = useRouter();
   const base = path.split('?')[0];
+  const { admin } = useStore();
 
   // Admin routes — no storefront chrome
-  if (base === '/admin') return <AdminDashboard />;
-  if (base === '/admin/products') return <ProductManagement />;
-  if (base === '/admin/inventory') return <InventoryManagement />;
-  if (base === '/admin/orders') return <OrderManagement />;
-  if (base === '/admin/analytics') return <SalesAnalytics />;
+  if (base.startsWith('/admin')) {
+    const { navigate } = useRouter();
+    if (!admin && base !== '/admin/login') {
+      navigate('/admin/login');
+      return null;
+    }
+
+    if (base === '/admin') return <AdminDashboard />;
+    if (base === '/admin/products') return <ProductManagement />;
+    if (base === '/admin/inventory') return <InventoryManagement />;
+    if (base === '/admin/orders') return <OrderManagement />;
+    if (base === '/admin/analytics') return <SalesAnalytics />;
+    if (base === '/admin/content-intelligence') return <ContentIntelligence />;
+    if (base.startsWith('/admin/content-intelligence/')) return <ContentPageDetails />;
+    if (base === '/admin/login') return <AdminLogin />;
+  }
 
   // Product details
   const productMatch = base.match(/^\/product\/(.+)$/);
@@ -38,6 +56,9 @@ function Routes() {
   else if (base === '/cart') page = <Cart />;
   else if (base === '/checkout') page = <Checkout />;
   else if (base === '/orders') page = <Orders />;
+  else if (base === '/login') page = <Login />;
+  else if (base === '/register') page = <Register />;
+  else if (base === '/profile') page = <Profile />;
   else page = <NotFound />;
 
   return (

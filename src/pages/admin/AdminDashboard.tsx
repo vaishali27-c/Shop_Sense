@@ -11,6 +11,7 @@ import { useStore } from '@/store/StoreContext';
 import { Link } from '@/lib/router';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { AdminAssistant } from '@/components/admin/AdminAssistant';
+import { GoogleIntegrationPanel } from '@/components/admin/GoogleIntegrationPanel';
 import { Badge, StockBadge } from '@/components/ui/Badge';
 import {
   formatINR,
@@ -180,6 +181,8 @@ export function AdminDashboard() {
             )}
           </div>
         </div>
+
+        <GoogleIntegrationPanel />
       </AdminLayout>
       <AdminAssistant />
     </>
