@@ -58,7 +58,7 @@ export async function syncInventoryForProduct(productId: string): Promise<void> 
 }
 
 export async function getUnitsSold(productId: string): Promise<number> {
-  const { OrderModel } = await import('../models/Order');
+  const { OrderModel } = await import('../models/Order.js');
   // Aggregate units sold from persisted orders. We include all orders
   // (the application doesn't currently have a 'Cancelled' status in the schema).
   const orders = await OrderModel.find().lean();

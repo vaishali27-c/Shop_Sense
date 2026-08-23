@@ -86,7 +86,7 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     res.status(401).json({ message: 'Authentication required to place an order.' });
     return;
   }
-  const { UserModel } = await import('../models/User');
+  const { UserModel } = await import('../models/User.js');
   const user = await UserModel.findById(reqAny.user.id).lean().catch(() => null);
   if (user) {
     payload.customerEmail = user.email;
