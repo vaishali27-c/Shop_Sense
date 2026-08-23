@@ -3,7 +3,7 @@
   publish = "dist"
 
 [build.environment]
-  VITE_API_BASE_URL = "https://shop-sense-6trn.onrender.com"
+  VITE_API_BASE_URL = "https://shop-sense-6trn.onrender.com/api"
 
 # Hash-based routing is used in the app, but this fallback keeps direct URL loads working.
 [[redirects]]
