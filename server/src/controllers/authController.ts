@@ -2,14 +2,9 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/User';
+import { authCookieOptions, clearAuthCookieOptions } from '../config/cookies';
 
 const USER_SECRET = process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { fullName, email, phone, password } = req.body;
@@ -28,7 +23,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   const user = await UserModel.create({ fullName, email, phone, passwordHash: hash });
 
   const token = jwt.sign({ id: user._id.toString(), email: user.email }, USER_SECRET, { expiresIn: '7d' });
-  res.cookie('shopsense_user', token, COOKIE_OPTIONS);
+  res.cookie('shopsense_user', token, authCookieOptions());
 
   res.status(201).json({ id: user._id.toString(), fullName: user.fullName, email: user.email });
 }
@@ -53,7 +48,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   const token = jwt.sign({ id: user._id.toString(), email: user.email }, USER_SECRET, { expiresIn: '7d' });
-  res.cookie('shopsense_user', token, COOKIE_OPTIONS);
+  res.cookie('shopsense_user', token, authCookieOptions());
 
   res.json({ id: user._id.toString(), fullName: user.fullName, email: user.email });
 }
@@ -76,6 +71,6 @@ export async function me(req: Request, res: Response): Promise<void> {
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
-  res.clearCookie('shopsense_user');
+  res.clearCookie('shopsense_user', clearAuthCookieOptions());
   res.status(204).send();
 }

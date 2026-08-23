@@ -2,14 +2,9 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AdminModel } from '../models/Admin';
+import { authCookieOptions, clearAuthCookieOptions } from '../config/cookies';
 
 const ADMIN_SECRET = process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
 
 export async function adminLogin(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body;
@@ -38,7 +33,7 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
   }
 
   const token = jwt.sign({ id: admin._id.toString(), email: admin.email }, ADMIN_SECRET, { expiresIn: '7d' });
-  res.cookie('shopsense_admin', token, COOKIE_OPTIONS);
+  res.cookie('shopsense_admin', token, authCookieOptions());
 
   res.json({ id: admin._id.toString(), email: admin.email, name: admin.name });
 }
@@ -60,6 +55,6 @@ export async function adminMe(req: Request, res: Response): Promise<void> {
 }
 
 export async function adminLogout(req: Request, res: Response): Promise<void> {
-  res.clearCookie('shopsense_admin');
+  res.clearCookie('shopsense_admin', clearAuthCookieOptions());
   res.status(204).send();
 }

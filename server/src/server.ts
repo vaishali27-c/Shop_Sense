@@ -7,6 +7,7 @@ import { apiRouter } from './routes/apiRoutes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import cookieParser from 'cookie-parser';
 import { createAdminIfMissing } from './middleware/auth';
+import { corsOptions } from './config/cors';
 import { ProductModel } from './models/Product';
 import { OrderModel } from './models/Order';
 import { syncAllInventory } from './services/inventoryService';
@@ -19,12 +20,17 @@ dotenv.config({ path: rootEnv });
 dotenv.config({ path: parentEnv });
 
 const app = express();
-const port = Number(process.env.PORT ?? 5000);
+const port = Number(process.env.PORT ?? 10000);
 const mongoUri = process.env.MONGODB_URI;
 
-app.use(cors());
+app.set('trust proxy', 1);
+app.use(cors(corsOptions()));
 app.use(cookieParser());
 app.use(express.json());
+
+app.get('/', (_req, res) => {
+  res.json({ message: 'ShopSense API is running successfully' });
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ShopSense API' });
@@ -86,8 +92,8 @@ async function syncFallbackOrders(): Promise<void> {
 }
 
 function startServer(): void {
-  app.listen(port, () => {
-    console.log(`[ShopSense API] Server running on http://localhost:${port}`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`[ShopSense API] Server running on port ${port}`);
   });
 }
 
