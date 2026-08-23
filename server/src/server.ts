@@ -104,7 +104,7 @@ if (!mongoUri) {
   mongoose
     .connect(mongoUri, { dbName: 'shopsense' })
     .then(async () => {
-      console.log('[ShopSense API] MongoDB connected');
+      console.log('[ShopSense API] MongoDB connected successfully');
       await syncProducts();
       await syncFallbackOrders();
       // create initial admin account from environment vars if present
@@ -125,7 +125,7 @@ if (!mongoUri) {
       startServer();
     })
     .catch((error) => {
-      console.error('[ShopSense API] MongoDB connection error:', error);
+      console.error('[ShopSense API] MongoDB connection failed');
       process.exit(1);
     });
 }
