@@ -1,11 +1,15 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { UserModel } from '../models/User';
 import { AdminModel } from '../models/Admin';
 
-const USER_SECRET = process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
-const ADMIN_SECRET = process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+function userSecret(): string {
+  return process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
+}
+
+function adminSecret(): string {
+  return process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+}
 
 declare global {
   namespace Express {
@@ -21,9 +25,11 @@ export function verifyUserToken(req: Request, _res: Response, next: NextFunction
   if (!token) return next();
 
   try {
-    const payload = jwt.verify(token, USER_SECRET) as any;
-    req.user = { id: payload.id, email: payload.email };
-  } catch (err) {
+    const payload = jwt.verify(token, userSecret()) as any;
+    if (payload && typeof payload === 'object' && payload.id && payload.email) {
+      req.user = { id: String(payload.id), email: String(payload.email) };
+    }
+  } catch {
     // ignore invalid token
   }
 
@@ -40,9 +46,11 @@ export function verifyAdminToken(req: Request, _res: Response, next: NextFunctio
   if (!token) return next();
 
   try {
-    const payload = jwt.verify(token, ADMIN_SECRET) as any;
-    req.admin = { id: payload.id, email: payload.email };
-  } catch (err) {
+    const payload = jwt.verify(token, adminSecret()) as any;
+    if (payload && typeof payload === 'object' && payload.id && payload.email) {
+      req.admin = { id: String(payload.id), email: String(payload.email) };
+    }
+  } catch {
     // ignore invalid token
   }
 

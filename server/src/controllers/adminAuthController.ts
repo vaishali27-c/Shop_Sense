@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import { AdminModel } from '../models/Admin';
 import { authCookieOptions, clearAuthCookieOptions } from '../config/cookies';
 
-const ADMIN_SECRET = process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+function adminSecret(): string {
+  return process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+}
 
 export async function adminLogin(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body;
@@ -32,14 +34,14 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const token = jwt.sign({ id: admin._id.toString(), email: admin.email }, ADMIN_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: admin._id.toString(), email: admin.email }, adminSecret(), { expiresIn: '7d' });
   res.cookie('shopsense_admin', token, authCookieOptions());
 
   res.json({ id: admin._id.toString(), email: admin.email, name: admin.name });
 }
 
 export async function adminMe(req: Request, res: Response): Promise<void> {
-  const adminReq = (req as any).admin;
+  const adminReq = req.admin;
   if (!adminReq) {
     res.status(401).json({ message: 'Unauthorized' });
     return;

@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/User';
 import { authCookieOptions, clearAuthCookieOptions } from '../config/cookies';
 
-const USER_SECRET = process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
+function userSecret(): string {
+  return process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
+}
 
 export async function register(req: Request, res: Response): Promise<void> {
   const { fullName, email, phone, password } = req.body;
@@ -22,7 +24,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   const hash = await bcrypt.hash(password, 10);
   const user = await UserModel.create({ fullName, email, phone, passwordHash: hash });
 
-  const token = jwt.sign({ id: user._id.toString(), email: user.email }, USER_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: user._id.toString(), email: user.email }, userSecret(), { expiresIn: '7d' });
   res.cookie('shopsense_user', token, authCookieOptions());
 
   res.status(201).json({ id: user._id.toString(), fullName: user.fullName, email: user.email });
@@ -47,7 +49,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const token = jwt.sign({ id: user._id.toString(), email: user.email }, USER_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: user._id.toString(), email: user.email }, userSecret(), { expiresIn: '7d' });
   res.cookie('shopsense_user', token, authCookieOptions());
 
   res.json({ id: user._id.toString(), fullName: user.fullName, email: user.email });
@@ -55,7 +57,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
 export async function me(req: Request, res: Response): Promise<void> {
   // req.user is set by middleware when token present
-  const user = (req as any).user;
+  const user = req.user;
   if (!user) {
     res.status(401).json({ message: 'Unauthorized' });
     return;

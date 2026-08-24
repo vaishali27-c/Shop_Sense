@@ -3,7 +3,7 @@ import { useStore } from '@/store/StoreContext';
 import { useRouter } from '@/lib/router';
 
 export default function Login() {
-  const { login } = useStore();
+  const { login, apiError } = useStore();
   const { path, navigate } = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +19,7 @@ export default function Login() {
       const params = new URLSearchParams(qp);
       const returnTo = params.get('return') ?? '/';
       navigate(returnTo);
-    } catch (err) {
+    } catch {
       // handled by store error state
     } finally {
       setLoading(false);
@@ -31,9 +31,10 @@ export default function Login() {
       <h1 className="text-2xl font-bold">Login</h1>
       <form onSubmit={submit} className="mt-6 max-w-md">
         <label className="block">Email</label>
-        <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input type="email" autoComplete="email" required className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
         <label className="block mt-3">Password</label>
-        <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input type="password" autoComplete="current-password" required className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
+        {apiError && <p className="mt-3 text-sm text-red-600" role="alert">{apiError}</p>}
         <div className="mt-4">
           <button className="btn-primary" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
         </div>
