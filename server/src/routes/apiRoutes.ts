@@ -38,9 +38,13 @@ import {
   getGscReport,
   getGa4Properties,
   getGa4Report,
+  getGa4DashboardReport,
 } from '../controllers/googleController';
 
+import { getWebsiteScore, testMlPrediction } from '../controllers/mlController';
 export const apiRouter = Router();
+
+
 
 apiRouter.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ShopSense API' });
@@ -93,6 +97,7 @@ apiRouter.get('/google/search-console/pages', verifyAdminToken, requireAdmin, ge
 apiRouter.get('/google/search-console/queries', verifyAdminToken, requireAdmin, getGscReport);
 apiRouter.get('/google/analytics/properties', verifyAdminToken, requireAdmin, getGa4Properties);
 apiRouter.get('/google/analytics/report', verifyAdminToken, requireAdmin, getGa4Report);
+apiRouter.get('/google/analytics/dashboard', verifyAdminToken, requireAdmin, getGa4DashboardReport);
 apiRouter.get('/google/analytics/traffic', verifyAdminToken, requireAdmin, getGa4Report);
 apiRouter.get('/google/analytics/events', verifyAdminToken, requireAdmin, getGa4Report);
 
@@ -102,3 +107,11 @@ apiRouter.get('/content-intelligence/pages/:id', verifyAdminToken, requireAdmin,
 apiRouter.get('/content-intelligence/summary', verifyAdminToken, requireAdmin, summary);
 apiRouter.post('/content-intelligence/seed', verifyAdminToken, requireAdmin, seed);
 apiRouter.post('/content-intelligence/recalculate', verifyAdminToken, requireAdmin, recalculate);
+
+apiRouter.get(
+  '/ml/test',
+  verifyAdminToken,
+  requireAdmin,
+  testMlPrediction,
+);
+apiRouter.get('/ml/website-score', verifyAdminToken, requireAdmin, getWebsiteScore);

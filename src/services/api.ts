@@ -24,6 +24,14 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function googleQuery(params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  return query.toString();
+}
+
 export type ApiProduct = {
   id: string;
   name: string;
@@ -200,12 +208,53 @@ export type GoogleReportRow = {
   metrics?: Record<string, number>;
 };
 
+export type Ga4DashboardSection = { rows: GoogleReportRow[]; error: string | null };
+export type Ga4Dashboard = {
+  property: string;
+  dateRange: { startDate: string; endDate: string };
+  overview: Ga4DashboardSection;
+  traffic: Ga4DashboardSection;
+  acquisition: Ga4DashboardSection;
+  trafficAcquisition: Ga4DashboardSection;
+  userAcquisition: Ga4DashboardSection;
+  pages: Ga4DashboardSection;
+  events: Ga4DashboardSection;
+  keyEvents: Ga4DashboardSection;
+  audience: Ga4DashboardSection;
+  demographics: Ga4DashboardSection;
+  technology: Ga4DashboardSection;
+  geography: Ga4DashboardSection;
+  landingPages: Ga4DashboardSection;
+};
+
+export type WebsiteScore = {
+  current_score: number;
+  predicted_score: number;
+  issue: string;
+  recommendation: string;
+  priority: string;
+  dateRange: { startDate: string; endDate: string };
+  ga4_score: number;
+  gsc_score: number;
+  overall_score: number;
+  ga4_metrics: { active_users: number; sessions: number; engaged_sessions: number; engagement_rate_pct: number; bounce_rate_pct: number };
+  gsc_metrics: { search_ctr_pct: number; search_impressions: number; search_clicks: number; avg_search_position: number };
+  feature_count: number;
+  fallback_count: number;
+  fallback_fields: string[];
+  generated_at: string;
+  ga4Property: string;
+  gscProperty: string;
+};
+
 export async function getGoogleStatus() { return apiRequest<GoogleStatus>('/google/status'); }
 export async function disconnectGoogle() { return apiRequest<void>('/google/disconnect', { method: 'POST' }); }
 export async function saveGoogleSelection(selection: { gscProperty?: string; ga4Property?: string }) { return apiRequest('/google/selection', { method: 'PUT', body: JSON.stringify(selection) }); }
 export async function getGscProperties() { return apiRequest<Array<{ siteUrl: string; permissionLevel: string }>>('/google/search-console/properties'); }
 export async function getGa4Properties() { return apiRequest<Array<{ id: string; displayName: string; accountName: string }>>('/google/analytics/properties'); }
-export async function getGscReport(params: { startDate?: string; endDate?: string; days?: number; dimensions?: string } = {}) { return apiRequest<{ rows: GoogleReportRow[]; property: string; dateRange: { startDate: string; endDate: string } }>(`/google/search-console/performance?${new URLSearchParams(params as Record<string, string>)}`); }
-export async function getGscPages(params: { startDate?: string; endDate?: string; days?: number } = {}) { return apiRequest<{ rows: GoogleReportRow[] }>(`/google/search-console/pages?${new URLSearchParams({ startDate: params.startDate ?? '', endDate: params.endDate ?? '', days: params.days ? String(params.days) : '', dimensions: 'page' })}`); }
-export async function getGscQueries(params: { startDate?: string; endDate?: string; days?: number } = {}) { return apiRequest<{ rows: GoogleReportRow[] }>(`/google/search-console/queries?${new URLSearchParams({ startDate: params.startDate ?? '', endDate: params.endDate ?? '', days: params.days ? String(params.days) : '', dimensions: 'query' })}`); }
-export async function getGa4Report(params: { startDate?: string; endDate?: string; days?: number; dimensions?: string; metrics?: string } = {}) { return apiRequest<{ rows: GoogleReportRow[]; property: string; dateRange: { startDate: string; endDate: string } }>(`/google/analytics/report?${new URLSearchParams(params as Record<string, string>)}`); }
+export async function getGscReport(params: { startDate?: string; endDate?: string; days?: number; dimensions?: string } = {}) { return apiRequest<{ rows: GoogleReportRow[]; property: string; dateRange: { startDate: string; endDate: string } }>(`/google/search-console/performance?${googleQuery(params)}`); }
+export async function getGscPages(params: { startDate?: string; endDate?: string; days?: number } = {}) { return apiRequest<{ rows: GoogleReportRow[] }>(`/google/search-console/pages?${googleQuery({ ...params, dimensions: 'page' })}`); }
+export async function getGscQueries(params: { startDate?: string; endDate?: string; days?: number } = {}) { return apiRequest<{ rows: GoogleReportRow[] }>(`/google/search-console/queries?${googleQuery({ ...params, dimensions: 'query' })}`); }
+export async function getGa4Report(params: { startDate?: string; endDate?: string; days?: number; dimensions?: string; metrics?: string } = {}) { return apiRequest<{ rows: GoogleReportRow[]; property: string; dateRange: { startDate: string; endDate: string } }>(`/google/analytics/report?${googleQuery(params)}`); }
+export async function getGa4Dashboard(params: { startDate?: string; endDate?: string; days?: number } = {}) { return apiRequest<Ga4Dashboard>(`/google/analytics/dashboard?${googleQuery(params)}`); }
+export async function getWebsiteScore(params: { startDate?: string; endDate?: string; days?: number } = {}) { return apiRequest<WebsiteScore>(`/ml/website-score?${googleQuery(params)}`); }

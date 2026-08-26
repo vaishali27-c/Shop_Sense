@@ -2,3 +2,9 @@ node_modules
 dist
 .env
 *.log
+
+credentials/
+*.json
+# Python
+__pycache__/
+*.pyc

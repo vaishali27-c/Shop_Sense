@@ -12,6 +12,7 @@ import { Link } from '@/lib/router';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { AdminAssistant } from '@/components/admin/AdminAssistant';
 import { GoogleIntegrationPanel } from '@/components/admin/GoogleIntegrationPanel';
+import { WebsiteScoreCard } from '@/components/admin/WebsiteScoreCard';
 import { Badge, StockBadge } from '@/components/ui/Badge';
 import {
   formatINR,
@@ -183,6 +184,7 @@ export function AdminDashboard() {
         </div>
 
         <GoogleIntegrationPanel />
+        <WebsiteScoreCard />
       </AdminLayout>
       <AdminAssistant />
     </>

@@ -3,20 +3,14 @@ import { GoogleConnectionModel } from '../models/GoogleConnection';
 import { beginGoogleOAuth, completeGoogleOAuth, sanitizeGoogleError } from '../services/googleOAuthService';
 import { listSearchConsoleProperties, querySearchConsole } from '../services/searchConsoleService';
 import { listGa4Properties, runGa4Report } from '../services/ga4Service';
+import { resolveGoogleDateRange } from '../services/googleDateRange';
+import { getGa4Dashboard } from '../services/ga4DashboardService';
 
 const frontendUrl = () => process.env.FRONTEND_URL ?? 'http://localhost:5173';
 const adminId = (req: Request) => req.admin!.id;
 
 async function connectionFor(req: Request) {
   return GoogleConnectionModel.findOne({ adminId: adminId(req) });
-}
-
-function range(req: Request) {
-  const end = new Date();
-  const start = new Date(end);
-  const days = Math.min(Math.max(Number(req.query.days ?? 28) || 28, 1), 90);
-  start.setUTCDate(end.getUTCDate() - days + 1);
-  return { startDate: String(req.query.startDate ?? start.toISOString().slice(0, 10)), endDate: String(req.query.endDate ?? end.toISOString().slice(0, 10)) };
 }
 
 export async function startGoogleOAuth(req: Request, res: Response) {
@@ -54,6 +48,7 @@ export async function saveGoogleSelection(req: Request, res: Response) {
 }
 
 export async function getGscProperties(req: Request, res: Response) { try { const c = await connectionFor(req); console.log(`[ShopSense Google] GET /google/search-console/properties admin=${adminId(req)} account=${c?.googleEmail ?? 'none'}`); if (!c) return res.status(400).json({ message: 'Connect Google first' }); const properties = await listSearchConsoleProperties(c); console.log(`[ShopSense Google] Search Console properties returned=${properties.length}`); res.json(properties); } catch (e) { res.status(502).json({ message: sanitizeGoogleError(e) }); } }
-export async function getGscReport(req: Request, res: Response) { try { const c = await connectionFor(req); if (!c?.selectedGscProperty) return res.status(400).json({ message: 'Select a Search Console property first' }); const dimensions = String(req.query.dimensions ?? 'date').split(',').filter(Boolean); res.json({ rows: await querySearchConsole(c, c.selectedGscProperty, range(req), dimensions), property: c.selectedGscProperty, dateRange: range(req) }); } catch (e) { res.status(502).json({ message: e instanceof Error && e.message === 'Invalid date range' ? e.message : sanitizeGoogleError(e) }); } }
+export async function getGscReport(req: Request, res: Response) { try { const c = await connectionFor(req); if (!c?.selectedGscProperty) return res.status(400).json({ message: 'Select a Search Console property first' }); const dateRange = resolveGoogleDateRange(req.query); const dimensions = String(req.query.dimensions ?? 'date').split(',').filter(Boolean); res.json({ rows: await querySearchConsole(c, c.selectedGscProperty, dateRange, dimensions), property: c.selectedGscProperty, dateRange }); } catch (e) { res.status(502).json({ message: e instanceof Error && e.message.startsWith('Invalid ') ? e.message : sanitizeGoogleError(e) }); } }
 export async function getGa4Properties(req: Request, res: Response) { try { const c = await connectionFor(req); console.log(`[ShopSense Google] GET /google/analytics/properties admin=${adminId(req)} account=${c?.googleEmail ?? 'none'}`); if (!c) return res.status(400).json({ message: 'Connect Google first' }); const properties = await listGa4Properties(c); console.log(`[ShopSense Google] GA4 properties returned=${properties.length}`); res.json(properties); } catch (e) { res.status(502).json({ message: sanitizeGoogleError(e) }); } }
-export async function getGa4Report(req: Request, res: Response) { try { const c = await connectionFor(req); if (!c?.selectedGa4Property) return res.status(400).json({ message: 'Select a GA4 property first' }); const dimensions = String(req.query.dimensions ?? 'date').split(',').filter(Boolean); const metrics = String(req.query.metrics ?? 'activeUsers,newUsers,sessions,engagementRate,averageSessionDuration,eventCount,conversions').split(',').filter(Boolean); res.json({ rows: await runGa4Report(c, c.selectedGa4Property, range(req), dimensions, metrics), property: c.selectedGa4Property, dateRange: range(req) }); } catch (e) { res.status(502).json({ message: e instanceof Error && e.message === 'Invalid date range' ? e.message : sanitizeGoogleError(e) }); } }
+export async function getGa4Report(req: Request, res: Response) { try { const c = await connectionFor(req); if (!c?.selectedGa4Property) return res.status(400).json({ message: 'Select a GA4 property first' }); const dateRange = resolveGoogleDateRange(req.query); const dimensions = String(req.query.dimensions ?? 'date').split(',').filter(Boolean); const metrics = String(req.query.metrics ?? 'activeUsers,newUsers,sessions,engagementRate,averageSessionDuration,eventCount,conversions').split(',').filter(Boolean); res.json({ rows: await runGa4Report(c, c.selectedGa4Property, dateRange, dimensions, metrics), property: c.selectedGa4Property, dateRange }); } catch (e) { res.status(502).json({ message: e instanceof Error && e.message.startsWith('Invalid ') ? e.message : sanitizeGoogleError(e) }); } }
+export async function getGa4DashboardReport(req: Request, res: Response) { try { const c = await connectionFor(req); if (!c?.selectedGa4Property) return res.status(400).json({ message: 'Select a GA4 property first' }); const dateRange = resolveGoogleDateRange(req.query); res.json(await getGa4Dashboard(c, c.selectedGa4Property, dateRange)); } catch (e) { res.status(502).json({ message: e instanceof Error && e.message.startsWith('Invalid ') ? e.message : sanitizeGoogleError(e) }); } }
