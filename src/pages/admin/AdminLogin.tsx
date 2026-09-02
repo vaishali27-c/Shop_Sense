@@ -28,8 +28,10 @@ export default function AdminLogin() {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('Invalid admin credentials') || msg.includes('Invalid credentials')) {
         setError('Invalid admin credentials.');
+      } else if (err instanceof TypeError) {
+        setError('Unable to reach the server. Check the API URL and browser connection.');
       } else {
-        setError('Unable to connect to the server. Please try again.');
+        setError(msg || 'Unable to connect to the server. Please try again.');
       }
     } finally {
       setLoading(false);

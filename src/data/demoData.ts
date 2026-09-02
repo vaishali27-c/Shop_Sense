@@ -454,8 +454,10 @@ function makeOrder(
     phone: '98765 43210',
     address: `12 MG Road, ${customer.split(' ')[0]} Nagar`,
     city: 'Bengaluru',
+    state: 'Karnataka',
     pincode: '560001',
     paymentMethod: 'Cash on Delivery',
+    paymentStatus: 'Pending',
     status,
     createdAt: daysAgo(daysOld),
   };

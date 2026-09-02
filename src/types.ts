@@ -39,6 +39,17 @@ export interface CartItem {
 
 export type PaymentMethod = 'Cash on Delivery' | 'Credit / Debit Card' | 'UPI / Wallet';
 
+export interface Address {
+  id: string;
+  userId: string;
+  label: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+  isDefault: boolean;
+}
+
 export type OrderStatus = 'Placed' | 'Confirmed' | 'Shipped' | 'Delivered';
 
 export interface OrderItem {
@@ -61,7 +72,10 @@ export interface Order {
   address: string;
   city: string;
   pincode: string;
+  state: string;
+  recipient?: { name: string; phone: string; email?: string };
   paymentMethod: PaymentMethod;
+  paymentStatus: 'Pending' | 'Successful' | 'Failed';
   status: OrderStatus;
   createdAt: string;
 }

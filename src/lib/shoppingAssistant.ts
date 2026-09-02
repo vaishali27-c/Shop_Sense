@@ -204,6 +204,77 @@ export function answerShoppingQuery(
   };
 }
 
+export async function answerShoppingQueryWithAI(
+  query: string,
+  products: Product[],
+): Promise<AssistantResult> {
+  if (!query.trim() || products.length === 0) {
+    return answerShoppingQuery(query, products);
+  }
+
+  try {
+    const response = await fetch('/api/ai/shopping', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        products,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI request failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as Partial<{
+      content?: unknown;
+      productIds?: unknown[];
+    }>;
+
+    const productMap = new Map(products.map((product) => [product.id, product] as const));
+    const matchedProducts: Product[] = [];
+    const seen = new Set<string>();
+
+    const candidateIds = Array.isArray(data.productIds) ? data.productIds : [];
+    for (const item of candidateIds) {
+      const id = typeof item === 'string' ? item.trim() : String(item ?? '').trim();
+      if (!id || seen.has(id)) continue;
+
+      const product = productMap.get(id);
+      if (!product) continue;
+
+      matchedProducts.push(product);
+      seen.add(id);
+
+      if (matchedProducts.length >= 6) break;
+    }
+
+    if (matchedProducts.length === 0) {
+      return {
+        content:
+          typeof data.content === 'string' && data.content.trim()
+            ? data.content.trim()
+            : "I couldn't find any products matching that request.",
+        products: [],
+      };
+    }
+
+    const content = typeof data.content === 'string' && data.content.trim()
+      ? data.content.trim()
+      : answerShoppingQuery(query, products).content;
+
+    return {
+      content,
+      products: matchedProducts.slice(0, 6).map(toPick),
+    };
+  } catch (error) {
+    console.error('[ShopSense AI]', error);
+    return answerShoppingQuery(query, products);
+  }
+}
+
 export function findSimilar(product: Product, all: Product[]): ProductPick[] {
   const sameCategory = all.filter(
     (p) => p.id !== product.id && p.category === product.category,

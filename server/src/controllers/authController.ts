@@ -72,6 +72,21 @@ export async function me(req: Request, res: Response): Promise<void> {
   res.json({ id: found._id.toString(), fullName: found.fullName, email: found.email, phone: found.phone });
 }
 
+export async function updateMe(req: Request, res: Response): Promise<void> {
+  if (!req.user) { res.status(401).json({ message: 'Unauthorized' }); return; }
+  const { fullName, email, phone } = req.body as { fullName?: unknown; email?: unknown; phone?: unknown };
+  if (typeof fullName !== 'string' || !fullName.trim() || typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email)) {
+    res.status(400).json({ message: 'Enter a valid name and email' }); return;
+  }
+  const duplicate = await UserModel.findOne({ email, _id: { $ne: req.user.id } });
+  if (duplicate) { res.status(409).json({ message: 'Email is already registered' }); return; }
+  const updated = await UserModel.findByIdAndUpdate(req.user.id, { fullName: fullName.trim(), email: email.trim(), phone: typeof phone === 'string' ? phone.trim() : '' }, { new: true }).select('-passwordHash');
+  if (!updated) { res.status(404).json({ message: 'User not found' }); return; }
+  const token = jwt.sign({ id: updated._id.toString(), email: updated.email }, userSecret(), { expiresIn: '7d' });
+  res.cookie('shopsense_user', token, authCookieOptions());
+  res.json({ id: updated._id.toString(), fullName: updated.fullName, email: updated.email, phone: updated.phone });
+}
+
 export async function logout(req: Request, res: Response): Promise<void> {
   res.clearCookie('shopsense_user', clearAuthCookieOptions());
   res.status(204).send();

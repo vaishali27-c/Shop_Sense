@@ -37,7 +37,10 @@ function decrypt(value: string): string {
 }
 
 export function createOAuthClient() {
-  return new google.auth.OAuth2(requiredEnv('GOOGLE_CLIENT_ID'), requiredEnv('GOOGLE_CLIENT_SECRET'), requiredEnv('GOOGLE_REDIRECT_URI'));
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI ?? (process.env.RENDER || process.env.NODE_ENV === 'production'
+    ? 'https://shop-sense-6trn.onrender.com/api/google/oauth/callback'
+    : 'http://localhost:10000/api/google/oauth/callback');
+  return new google.auth.OAuth2(requiredEnv('GOOGLE_CLIENT_ID'), requiredEnv('GOOGLE_CLIENT_SECRET'), redirectUri);
 }
 
 export async function beginGoogleOAuth(adminId: string): Promise<string> {
@@ -98,9 +101,33 @@ export async function getAuthorizedClient(connection: StoredConnection): Promise
   return client;
 }
 
-export function sanitizeGoogleError(error: unknown): string {
+function googleErrorCode(error: unknown): string | undefined {
+  const responseData = (error as { response?: { data?: unknown } })?.response?.data;
+  if (typeof responseData === 'string') return responseData;
+  if (responseData && typeof responseData === 'object' && 'error' in responseData) {
+    const code = responseData.error;
+    if (typeof code === 'string') return code;
+    if (code && typeof code === 'object' && 'status' in code) return String(code.status);
+  }
+  return undefined;
+}
+
+export function isGoogleAuthorizationError(error: unknown): boolean {
   const status = (error as { response?: { status?: number } })?.response?.status;
-  if (status === 401 || status === 403) return 'Google authorization expired or does not include the required permissions. Reconnect Google.';
+  return status === 401 || status === 403 || googleErrorCode(error) === 'invalid_grant';
+}
+
+export async function recordGoogleAuthorizationError(adminId: string, error: unknown): Promise<void> {
+  if (!isGoogleAuthorizationError(error)) return;
+  await GoogleConnectionModel.updateOne(
+    { adminId },
+    { $set: { status: 'error', lastError: 'Google authorization expired or was revoked. Reconnect Google.' } },
+  );
+}
+
+export function sanitizeGoogleError(error: unknown): string {
+  if (isGoogleAuthorizationError(error)) return 'Google authorization expired or was revoked. Reconnect Google.';
+  const status = (error as { response?: { status?: number } })?.response?.status;
   if (status === 429) return 'Google API quota has been reached. Please try again later.';
   return 'Google API request failed. Check the selected property and try again.';
 }

@@ -8,7 +8,22 @@ export interface IOrderItem {
   image: string;
 }
 
+export interface IShippingAddress {
+  label?: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface IRecipient {
+  name: string;
+  phone: string;
+  email?: string;
+}
+
 export interface IOrder extends Document {
+  userId: string;
   orderId: string;
   customerName: string;
   customerEmail: string;
@@ -16,7 +31,11 @@ export interface IOrder extends Document {
   address: string;
   city: string;
   pincode: string;
+  state: string;
+  shippingAddress: IShippingAddress;
+  recipient?: IRecipient;
   paymentMethod: 'Cash on Delivery' | 'Credit / Debit Card' | 'UPI / Wallet';
+  paymentStatus: 'Pending' | 'Successful' | 'Failed';
   items: IOrderItem[];
   totalAmount: number;
   orderDate: Date;
@@ -36,6 +55,7 @@ const OrderItemSchema = new Schema<IOrderItem>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    userId: { type: String, required: true, index: true },
     orderId: { type: String, required: true, unique: true, index: true },
     customerName: { type: String, required: true, trim: true },
     customerEmail: { type: String, required: true, trim: true },
@@ -43,10 +63,28 @@ const OrderSchema = new Schema<IOrder>(
     address: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     pincode: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true, default: '' },
+    shippingAddress: {
+      label: { type: String, trim: true },
+      street: { type: String, required: true, trim: true },
+      city: { type: String, required: true, trim: true },
+      state: { type: String, required: true, trim: true },
+      pincode: { type: String, required: true, trim: true },
+    },
+    recipient: {
+      name: { type: String, trim: true },
+      phone: { type: String, trim: true },
+      email: { type: String, trim: true },
+    },
     paymentMethod: {
       type: String,
       enum: ['Cash on Delivery', 'Credit / Debit Card', 'UPI / Wallet'],
       required: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['Pending', 'Successful', 'Failed'],
+      default: 'Pending',
     },
     items: { type: [OrderItemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },

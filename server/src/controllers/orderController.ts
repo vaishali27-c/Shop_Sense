@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { OrderModel } from '../models/Order';
 import { ProductModel } from '../models/Product';
 import { syncInventoryForProduct } from '../services/inventoryService';
-import { fallbackOrders, fallbackProducts } from '../services/fallbackData';
+import { fallbackOrders } from '../services/fallbackData';
 
 function isMongoReady(): boolean {
   return Boolean(process.env.MONGODB_URI) && mongoose.connection.readyState === 1;
@@ -25,7 +25,7 @@ export async function getOrders(_req: Request, res: Response): Promise<void> {
 
   // If user is authenticated, return only that user's orders
   if (reqAny.user) {
-    const orders = await OrderModel.find({ customerEmail: reqAny.user.email }).sort({ orderDate: -1 });
+    const orders = await OrderModel.find({ userId: reqAny.user.id }).sort({ orderDate: -1 });
     res.json(orders);
     return;
   }
@@ -35,7 +35,16 @@ export async function getOrders(_req: Request, res: Response): Promise<void> {
 }
 
 export async function getOrder(req: Request, res: Response): Promise<void> {
+  const reqAny = req as any;
+  if (!reqAny.admin && !reqAny.user) {
+    res.status(401).json({ message: 'Authentication required to view orders.' });
+    return;
+  }
   if (!isMongoReady()) {
+    if (!reqAny.admin) {
+      res.status(404).json({ message: 'Order not found' });
+      return;
+    }
     const order = fallbackOrders.find((entry) => entry.orderId === req.params.id);
     if (!order) {
       res.status(404).json({ message: 'Order not found' });
@@ -46,7 +55,8 @@ export async function getOrder(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const order = await OrderModel.findOne({ orderId: req.params.id });
+  const query = reqAny.admin ? { orderId: req.params.id } : { orderId: req.params.id, userId: reqAny.user.id };
+  const order = await OrderModel.findOne(query);
   if (!order) {
     res.status(404).json({ message: 'Order not found' });
     return;
@@ -57,6 +67,11 @@ export async function getOrder(req: Request, res: Response): Promise<void> {
 
 export async function createOrder(req: Request, res: Response): Promise<void> {
   const payload = req.body;
+  const reqAny = req as any;
+  if (!reqAny.user) {
+    res.status(401).json({ message: 'Authentication required to place an order.' });
+    return;
+  }
 
   const validPaymentMethods = ['Cash on Delivery', 'Credit / Debit Card', 'UPI / Wallet'];
   if (
@@ -65,6 +80,7 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     !payload.customerPhone ||
     !payload.address ||
     !payload.city ||
+    !payload.state ||
     !payload.pincode ||
     !payload.paymentMethod ||
     !validPaymentMethods.includes(payload.paymentMethod) ||
@@ -80,12 +96,6 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // tie order to authenticated user (prevent spoofing)
-  const reqAny = req as any;
-  if (!reqAny.user) {
-    res.status(401).json({ message: 'Authentication required to place an order.' });
-    return;
-  }
   const { UserModel } = await import('../models/User.js');
   const user = await UserModel.findById(reqAny.user.id).lean().catch(() => null);
   if (user) {
@@ -129,10 +139,21 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     customerName: payload.customerName,
     customerEmail: payload.customerEmail,
     customerPhone: payload.customerPhone,
+    userId: reqAny.user.id,
     address: payload.address,
     city: payload.city,
     pincode: payload.pincode,
+    state: payload.state,
+    shippingAddress: {
+      label: payload.addressLabel,
+      street: payload.address,
+      city: payload.city,
+      state: payload.state,
+      pincode: payload.pincode,
+    },
+    recipient: payload.recipient,
     paymentMethod: payload.paymentMethod,
+    paymentStatus: payload.paymentMethod === 'Cash on Delivery' ? 'Pending' : 'Successful',
     items: orderItems,
     totalAmount,
     orderDate: new Date(),

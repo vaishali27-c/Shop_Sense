@@ -83,6 +83,24 @@ MONGODB_URI=mongodb://127.0.0.1:27017/shopsense
 PORT=5000
 ```
 
+## Google OAuth Setup
+
+The Google OAuth client must contain the exact callback URI used by the API:
+
+```text
+https://shop-sense-6trn.onrender.com/api/google/oauth/callback
+```
+
+Add both values under **Authorized redirect URIs** for the same OAuth client configured as `GOOGLE_CLIENT_ID`. For local development, set `GOOGLE_REDIRECT_URI` to this callback:
+
+```text
+http://localhost:5000/api/google/oauth/callback
+```
+
+Set `GOOGLE_REDIRECT_URI` in the deployed Render service to the production URI and locally to the local URI. The backend selects the local or production default when the variable is omitted, but setting it explicitly is recommended. Google compares this value exactly, including the protocol, hostname, path, and trailing slash.
+
+After changing frontend code or `netlify.toml`, trigger a new Netlify deploy. The production site must serve a new `/assets/index-*.js` bundle; an old cached bundle can continue showing outdated login errors.
+
 ## How to Run Frontend
 
 ```bash

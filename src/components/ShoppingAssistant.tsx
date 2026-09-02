@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sparkles, X, Send, ShoppingBag } from 'lucide-react';
 import { useStore } from '@/store/StoreContext';
 import { Link } from '@/lib/router';
-import { answerShoppingQuery } from '@/lib/shoppingAssistant';
+import { answerShoppingQueryWithAI } from '@/lib/shoppingAssistant';
 import type { ChatMessage } from '@/types';
 import { formatINR } from '@/lib/inventory';
 import { StarRating } from '@/components/ui/StarRating';
@@ -41,20 +41,24 @@ export function ShoppingAssistant() {
     }
   }, [messages, typing, open]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
     const userMsg: ChatMessage = {
       id: uid(),
       role: 'user',
       content: trimmed,
       createdAt: new Date().toISOString(),
     };
+
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setTyping(true);
-    setTimeout(() => {
-      const res = answerShoppingQuery(trimmed, products);
+
+    try {
+      const res = await answerShoppingQueryWithAI(trimmed, products);
+
       setMessages((prev) => [
         ...prev,
         {
@@ -65,8 +69,22 @@ export function ShoppingAssistant() {
           createdAt: new Date().toISOString(),
         },
       ]);
+    } catch (error) {
+      console.error('[Shopping Assistant]', error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          role: 'assistant',
+          content:
+            'Sorry, I could not process your request right now. Please try again.',
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } finally {
       setTyping(false);
-    }, 450);
+    }
   };
 
   return (

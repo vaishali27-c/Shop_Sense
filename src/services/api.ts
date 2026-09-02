@@ -52,6 +52,7 @@ export type ApiProduct = {
 };
 
 export type ApiOrder = {
+  userId: string;
   orderId: string;
   customerName: string;
   customerEmail: string;
@@ -59,7 +60,11 @@ export type ApiOrder = {
   address: string;
   city: string;
   pincode: string;
+  state?: string;
+  shippingAddress?: { label?: string; street: string; city: string; state: string; pincode: string };
+  recipient?: { name: string; phone: string; email?: string };
   paymentMethod: 'Cash on Delivery' | 'Credit / Debit Card' | 'UPI / Wallet';
+  paymentStatus: 'Pending' | 'Successful' | 'Failed';
   items: Array<{
     productId: string;
     name: string;
@@ -111,8 +116,36 @@ export interface CreateOrderInput {
   address: string;
   city: string;
   pincode: string;
+  state: string;
+  addressLabel?: string;
+  recipient?: { name: string; phone: string; email?: string };
   paymentMethod: 'Cash on Delivery' | 'Credit / Debit Card' | 'UPI / Wallet';
   items: Array<{ productId: string; quantity: number }>;
+}
+
+export type ApiAddress = {
+  _id: string;
+  userId: string;
+  label: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+  isDefault: boolean;
+};
+
+export async function getAddresses(): Promise<ApiAddress[]> { return apiRequest<ApiAddress[]>('/addresses'); }
+export async function createAddress(input: Omit<ApiAddress, '_id' | 'userId'>): Promise<ApiAddress> {
+  return apiRequest<ApiAddress>('/addresses', { method: 'POST', body: JSON.stringify(input) });
+}
+export async function updateAddress(id: string, input: Omit<ApiAddress, '_id' | 'userId'>): Promise<ApiAddress> {
+  return apiRequest<ApiAddress>(`/addresses/${id}`, { method: 'PUT', body: JSON.stringify(input) });
+}
+export async function deleteAddress(id: string): Promise<void> {
+  await apiRequest<void>(`/addresses/${id}`, { method: 'DELETE' });
+}
+export async function setDefaultAddress(id: string): Promise<ApiAddress[]> {
+  return apiRequest<ApiAddress[]>(`/addresses/${id}/default`, { method: 'PUT' });
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<ApiOrder> {
@@ -170,6 +203,9 @@ export async function loginUser(payload: { email: string; password: string }) {
 
 export async function meUser() {
   return apiRequest('/auth/me');
+}
+export async function updateUser(payload: { fullName: string; email: string; phone?: string }) {
+  return apiRequest<{ id: string; fullName: string; email: string; phone?: string }>('/auth/me', { method: 'PUT', body: JSON.stringify(payload) });
 }
 
 export async function logoutUser() {

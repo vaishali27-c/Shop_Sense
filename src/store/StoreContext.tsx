@@ -7,8 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { CartItem, Order, OrderStatus, PaymentMethod, Product } from '@/types';
-import { PRODUCTS, SEED_ORDERS } from '@/data/demoData';
+import type { Address, CartItem, Order, OrderStatus, PaymentMethod, Product } from '@/types';
+import { PRODUCTS } from '@/data/demoData';
 import {
   createOrder,
   createProduct,
@@ -19,12 +19,21 @@ import {
   updateProduct as apiUpdateProduct,
   type ApiOrder,
   type ApiProduct,
+  type ApiAddress,
+  getAddresses,
+  updateUser,
+  createAddress as apiCreateAddress,
+  updateAddress as apiUpdateAddress,
+  deleteAddress as apiDeleteAddress,
+  setDefaultAddress as apiSetDefaultAddress,
 } from '@/services/api';
 import { registerUser, loginUser, meUser, logoutUser, loginAdmin, meAdmin, logoutAdmin } from '@/services/api';
 
 const STORAGE_KEYS = {
-  cart: 'shopsense_cart',
+  cart: 'shopsense_cart_guest',
 } as const;
+
+function cartKey(userId?: string | null): string { return userId ? `shopsense_cart_${userId}` : STORAGE_KEYS.cart; }
 
 function apiProductToProduct(product: ApiProduct): Product {
   return {
@@ -47,6 +56,10 @@ function apiProductToProduct(product: ApiProduct): Product {
   };
 }
 
+function apiAddressToAddress(address: ApiAddress): Address {
+  return { id: address._id, userId: address.userId, label: address.label, street: address.street, city: address.city, state: address.state, pincode: address.pincode, isDefault: address.isDefault };
+}
+
 function apiOrderToOrder(order: ApiOrder): Order {
   return {
     id: order.orderId,
@@ -66,7 +79,10 @@ function apiOrderToOrder(order: ApiOrder): Order {
     address: order.address ?? '',
     city: order.city ?? '',
     pincode: order.pincode ?? '',
+    state: order.shippingAddress?.state ?? order.state ?? '',
+    recipient: order.recipient,
     paymentMethod: order.paymentMethod ?? 'Cash on Delivery',
+    paymentStatus: order.paymentStatus ?? 'Pending',
     status: order.status,
     createdAt: order.orderDate,
   };
@@ -105,7 +121,14 @@ export interface NewProductInput {
 
 interface StoreContextValue {
   products: Product[];
-  currentUser?: { id: string; fullName: string; email: string } | null;
+  currentUser?: { id: string; fullName: string; email: string; phone?: string } | null;
+  addresses: Address[];
+  refreshAddresses: () => Promise<void>;
+  saveAddress: (input: Omit<Address, 'id' | 'userId'>) => Promise<void>;
+  editAddress: (id: string, input: Omit<Address, 'id' | 'userId'>) => Promise<void>;
+  removeAddress: (id: string) => Promise<void>;
+  makeDefaultAddress: (id: string) => Promise<void>;
+  updateProfile: (payload: { fullName: string; email: string; phone?: string }) => Promise<void>;
   admin?: { id: string; email: string; name?: string } | null;
   cart: CartItem[];
   orders: Order[];
@@ -125,7 +148,10 @@ interface StoreContextValue {
     phone: string;
     address: string;
     city: string;
+    state: string;
     pincode: string;
+    addressLabel?: string;
+    recipient?: { name: string; phone: string; email?: string };
     paymentMethod: PaymentMethod;
   }) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
@@ -146,14 +172,13 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>(() => PRODUCTS);
-  const [cart, setCart] = useState<CartItem[]>(() =>
-    load(STORAGE_KEYS.cart, []),
-  );
+  const [cart, setCart] = useState<CartItem[]>(() => load(STORAGE_KEYS.cart, []));
   const [orders, setOrders] = useState<Order[]>(() => []);
   const [cartMessage, setCartMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ id: string; fullName: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; fullName: string; email: string; phone?: string } | null>(null);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [admin, setAdmin] = useState<{ id: string; email: string; name?: string } | null>(null);
 
   useEffect(() => {
@@ -164,14 +189,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setApiError(null);
 
       try {
-        const [apiProducts, apiOrders] = await Promise.all([
-          getProducts(),
-          getOrders(),
-        ]);
+        const apiProducts = await getProducts();
 
         if (!cancelled) {
           setProducts(apiProducts.map(apiProductToProduct));
-          setOrders(apiOrders.map(apiOrderToOrder));
         }
       } catch (error) {
         if (!cancelled) {
@@ -187,12 +208,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async function loadAuth() {
       try {
         const me = await meUser().catch(() => null);
-        if (me) setCurrentUser({ id: (me as any).id, fullName: (me as any).fullName, email: (me as any).email });
+        if (me) {
+          const user = { id: (me as any).id, fullName: (me as any).fullName, email: (me as any).email, phone: (me as any).phone };
+          setCurrentUser(user);
+          setCart(load(cartKey(user.id), []));
+          const apiOrders = await getOrders();
+          if (!cancelled) setOrders(apiOrders.map(apiOrderToOrder));
+          const apiAddresses = await getAddresses();
+          if (!cancelled) setAddresses(apiAddresses.map(apiAddressToAddress));
+        }
       } catch {}
 
       try {
         const adm = await meAdmin().catch(() => null);
-        if (adm) setAdmin({ id: (adm as any).id, email: (adm as any).email, name: (adm as any).name });
+        if (adm) {
+          setAdmin({ id: (adm as any).id, email: (adm as any).email, name: (adm as any).name });
+          const apiOrders = await getOrders();
+          if (!cancelled) setOrders(apiOrders.map(apiOrderToOrder));
+        }
       } catch {}
     }
 
@@ -204,7 +237,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => save(STORAGE_KEYS.cart, cart), [cart]);
+  useEffect(() => save(cartKey(currentUser?.id), cart), [cart, currentUser?.id]);
 
   const sanitizeCart = useCallback(
     (currentCart: CartItem[], availableProducts: Product[]) => {
@@ -309,11 +342,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCart([]);
     setCartMessage(null);
     try {
-      localStorage.removeItem(STORAGE_KEYS.cart);
+      localStorage.removeItem(cartKey(currentUser?.id));
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [currentUser?.id]);
 
   const placeOrder: StoreContextValue['placeOrder'] = useCallback(
     async (info) => {
@@ -362,7 +395,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         customerPhone: info.phone,
         address: info.address,
         city: info.city,
+        state: info.state,
         pincode: info.pincode,
+        addressLabel: info.addressLabel,
+        recipient: info.recipient,
         paymentMethod: info.paymentMethod,
         items: orderItems,
       };
@@ -381,6 +417,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           address: info.address,
           city: info.city,
           pincode: info.pincode,
+          state: info.state,
+          recipient: info.recipient,
           paymentMethod: info.paymentMethod,
           subtotal: apiOrder.totalAmount,
           deliveryCharge: 0,
@@ -390,7 +428,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setOrders((prev) => [orderWithContext, ...prev]);
         setCart([]);
         try {
-          localStorage.removeItem(STORAGE_KEYS.cart);
+          localStorage.removeItem(cartKey(currentUser?.id));
         } catch {
           /* ignore */
         }
@@ -402,8 +440,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [cart, sanitizeCart],
+    [cart, currentUser?.id, sanitizeCart],
   );
+
+  const refreshAddresses = useCallback(async () => {
+    const next = await getAddresses();
+    setAddresses(next.map(apiAddressToAddress));
+  }, []);
+
+  const saveAddress = useCallback(async (input: Omit<Address, 'id' | 'userId'>) => {
+    await apiCreateAddress(input);
+    await refreshAddresses();
+  }, [refreshAddresses]);
+
+  const editAddress = useCallback(async (id: string, input: Omit<Address, 'id' | 'userId'>) => {
+    await apiUpdateAddress(id, input);
+    await refreshAddresses();
+  }, [refreshAddresses]);
+
+  const removeAddress = useCallback(async (id: string) => {
+    await apiDeleteAddress(id);
+    await refreshAddresses();
+  }, [refreshAddresses]);
+
+  const makeDefaultAddress = useCallback(async (id: string) => {
+    const next = await apiSetDefaultAddress(id);
+    setAddresses(next.map(apiAddressToAddress));
+  }, []);
+
+  const updateProfile = useCallback(async (payload: { fullName: string; email: string; phone?: string }) => {
+    const updated = await updateUser(payload);
+    setCurrentUser(updated);
+  }, []);
 
   const updateOrderStatus = useCallback(
     async (orderId: string, status: OrderStatus) => {
@@ -477,6 +545,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     apiError,
     cartMessage,
     currentUser,
+    addresses,
+    refreshAddresses,
+    saveAddress,
+    editAddress,
+    removeAddress,
+    makeDefaultAddress,
+    updateProfile,
     admin,
     addToCart,
     updateCartQty,
@@ -493,9 +568,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         await registerUser(payload);
         const me = await meUser();
-        setCurrentUser({ id: (me as any).id, fullName: (me as any).fullName, email: (me as any).email });
+        setCurrentUser({ id: (me as any).id, fullName: (me as any).fullName, email: (me as any).email, phone: (me as any).phone });
         const apiOrders = await getOrders();
         setOrders(apiOrders.map(apiOrderToOrder));
+        setCart(load(cartKey((me as any).id), []));
+        const apiAddresses = await getAddresses();
+        setAddresses(apiAddresses.map(apiAddressToAddress));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Registration failed';
         setApiError(message);
@@ -506,9 +584,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         await loginUser(payload);
         const me = await meUser();
-        setCurrentUser({ id: (me as any).id, fullName: (me as any).fullName, email: (me as any).email });
+        setCurrentUser({ id: (me as any).id, fullName: (me as any).fullName, email: (me as any).email, phone: (me as any).phone });
         const apiOrders = await getOrders();
         setOrders(apiOrders.map(apiOrderToOrder));
+        setCart(load(cartKey((me as any).id), []));
+        const apiAddresses = await getAddresses();
+        setAddresses(apiAddresses.map(apiAddressToAddress));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Login failed';
         setApiError(message);
@@ -521,6 +602,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } finally {
         setCurrentUser(null);
         setOrders([]);
+        setAddresses([]);
+        setCart(load(STORAGE_KEYS.cart, []));
       }
     },
     adminLogin: async (payload) => {
@@ -528,6 +611,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await loginAdmin(payload);
         const adm = await meAdmin();
         setAdmin({ id: (adm as any).id, email: (adm as any).email, name: (adm as any).name });
+        const apiOrders = await getOrders();
+        setOrders(apiOrders.map(apiOrderToOrder));
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Admin login failed';
         setApiError(message);

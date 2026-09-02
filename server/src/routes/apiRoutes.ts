@@ -12,7 +12,7 @@ import {
   getOrders,
   updateOrderStatus,
 } from '../controllers/orderController';
-import { register, login, me as meUser, logout as logoutUser } from '../controllers/authController';
+import { register, login, me as meUser, updateMe, logout as logoutUser } from '../controllers/authController';
 import { adminLogin, adminMe, adminLogout } from '../controllers/adminAuthController';
 import {
   listPages,
@@ -42,12 +42,40 @@ import {
 } from '../controllers/googleController';
 
 import { getWebsiteScore, testMlPrediction } from '../controllers/mlController';
+import { askGeminiShoppingAssistant } from '../services/geminiShoppingService';
+import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress } from '../controllers/addressController';
+
 export const apiRouter = Router();
-
-
 
 apiRouter.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ShopSense API' });
+});
+
+apiRouter.post('/ai/shopping', async (req, res) => {
+  try {
+    const { query, products } = req.body as { query?: unknown; products?: unknown };
+
+    if (typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({
+        error: 'Query is required',
+      });
+    }
+
+    if (!Array.isArray(products)) {
+      return res.status(400).json({
+        error: 'Products must be an array',
+      });
+    }
+
+    const result = await askGeminiShoppingAssistant(query, products);
+    return res.json(result);
+  } catch (error) {
+    console.error('[AI Shopping Route]', error);
+
+    return res.status(500).json({
+      error: 'Unable to process shopping request',
+    });
+  }
 });
 
 apiRouter.get('/products', getProducts);
@@ -64,6 +92,11 @@ apiRouter.get('/orders/:id', getOrder);
 // placing orders requires an authenticated customer session
 apiRouter.post('/orders', verifyUserToken, requireUser, createOrder);
 apiRouter.put('/orders/:id/status', verifyAdminToken, requireAdmin, updateOrderStatus);
+apiRouter.get('/addresses', verifyUserToken, requireUser, getAddresses);
+apiRouter.post('/addresses', verifyUserToken, requireUser, createAddress);
+apiRouter.put('/addresses/:id', verifyUserToken, requireUser, updateAddress);
+apiRouter.delete('/addresses/:id', verifyUserToken, requireUser, deleteAddress);
+apiRouter.put('/addresses/:id/default', verifyUserToken, requireUser, setDefaultAddress);
 
 // inventory is admin-only
 apiRouter.get('/inventory', verifyAdminToken, requireAdmin, getInventory);
@@ -78,6 +111,7 @@ apiRouter.get('/analytics/top-products', verifyAdminToken, requireAdmin, getTopP
 apiRouter.post('/auth/register', register);
 apiRouter.post('/auth/login', login);
 apiRouter.get('/auth/me', verifyUserToken, requireUser, meUser);
+apiRouter.put('/auth/me', verifyUserToken, requireUser, updateMe);
 apiRouter.post('/auth/logout', logoutUser);
 
 // admin auth (separate)
