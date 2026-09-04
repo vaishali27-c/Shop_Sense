@@ -28,8 +28,11 @@ import type { OrderStatus } from '@/types';
 const STATUS_TONE: Record<OrderStatus, 'neutral' | 'info' | 'warning' | 'success'> = {
   Placed: 'neutral',
   Confirmed: 'info',
+  Processing: 'info',
   Shipped: 'warning',
+  'Out for Delivery': 'warning',
   Delivered: 'success',
+  Cancelled: 'warning',
 };
 
 export function AdminDashboard() {

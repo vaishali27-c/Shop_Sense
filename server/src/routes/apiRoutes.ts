@@ -42,7 +42,7 @@ import {
 } from '../controllers/googleController';
 
 import { getWebsiteScore, testMlPrediction } from '../controllers/mlController';
-import { askGeminiShoppingAssistant } from '../services/geminiShoppingService';
+import { askGeminiShoppingAssistant, isOrderQuery } from '../services/geminiShoppingService';
 import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress } from '../controllers/addressController';
 
 export const apiRouter = Router();
@@ -51,7 +51,7 @@ apiRouter.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'ShopSense API' });
 });
 
-apiRouter.post('/ai/shopping', async (req, res) => {
+apiRouter.post('/ai/shopping', verifyUserToken, async (req, res) => {
   try {
     const { query, products } = req.body as { query?: unknown; products?: unknown };
 
@@ -61,13 +61,17 @@ apiRouter.post('/ai/shopping', async (req, res) => {
       });
     }
 
+    if (isOrderQuery(query) && !req.user) {
+      return res.status(401).json({ error: 'Authentication required to view orders.' });
+    }
+
     if (!Array.isArray(products)) {
       return res.status(400).json({
         error: 'Products must be an array',
       });
     }
 
-    const result = await askGeminiShoppingAssistant(query, products);
+    const result = await askGeminiShoppingAssistant(query, products, req.user?.id);
     return res.json(result);
   } catch (error) {
     console.error('[AI Shopping Route]', error);
@@ -88,6 +92,7 @@ apiRouter.delete('/products/:id', verifyAdminToken, requireAdmin, deleteProduct)
 // Orders: admin sees all; logged-in users see their orders; unauthenticated gets fallback
 apiRouter.use(verifyUserToken, verifyAdminToken);
 apiRouter.get('/orders', getOrders);
+apiRouter.get('/orders/my-orders', verifyUserToken, requireUser, getOrders);
 apiRouter.get('/orders/:id', getOrder);
 // placing orders requires an authenticated customer session
 apiRouter.post('/orders', verifyUserToken, requireUser, createOrder);

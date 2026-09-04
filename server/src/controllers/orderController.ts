@@ -73,6 +73,27 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.items)) {
+    res.status(400).json({ message: 'Invalid order payload' });
+    return;
+  }
+
+  const itemIds = new Set<string>();
+  for (const item of payload.items) {
+    if (
+      !item ||
+      typeof item.productId !== 'string' ||
+      !item.productId.trim() ||
+      !Number.isInteger(item.quantity) ||
+      item.quantity < 1 ||
+      itemIds.has(item.productId)
+    ) {
+      res.status(400).json({ message: 'Invalid order items' });
+      return;
+    }
+    itemIds.add(item.productId);
+  }
+
   const validPaymentMethods = ['Cash on Delivery', 'Credit / Debit Card', 'UPI / Wallet'];
   if (
     !payload.customerName ||
@@ -84,7 +105,6 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
     !payload.pincode ||
     !payload.paymentMethod ||
     !validPaymentMethods.includes(payload.paymentMethod) ||
-    !Array.isArray(payload.items) ||
     payload.items.length === 0
   ) {
     res.status(400).json({ message: 'Invalid order payload' });
@@ -98,11 +118,15 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
 
   const { UserModel } = await import('../models/User.js');
   const user = await UserModel.findById(reqAny.user.id).lean().catch(() => null);
-  if (user) {
-    payload.customerEmail = user.email;
-    payload.customerName = user.fullName ?? payload.customerName;
-    payload.customerPhone = user.phone ?? payload.customerPhone;
+  if (!user) {
+    res.status(401).json({ message: 'Authenticated user not found' });
+    return;
   }
+
+  // Identity and contact details come from the authenticated account, not assistant input.
+  payload.customerEmail = user.email;
+  payload.customerName = user.fullName;
+  payload.customerPhone = user.phone ?? payload.customerPhone;
 
   const orderItems = [];
 
@@ -173,7 +197,7 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
 }
 
 export async function updateOrderStatus(req: Request, res: Response): Promise<void> {
-  const validStatuses = ['Placed', 'Confirmed', 'Shipped', 'Delivered'];
+  const validStatuses = ['Placed', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'];
   const nextStatus = req.body.status;
 
   if (!validStatuses.includes(nextStatus)) {

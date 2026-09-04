@@ -10,15 +10,18 @@ import type { OrderStatus } from '@/types';
 const STATUS_TONE: Record<OrderStatus, 'neutral' | 'info' | 'warning' | 'success'> = {
   Placed: 'neutral',
   Confirmed: 'info',
+  Processing: 'info',
   Shipped: 'warning',
+  'Out for Delivery': 'warning',
   Delivered: 'success',
+  Cancelled: 'warning',
 };
 
 export function Orders() {
   const { orders } = useStore();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const requestedOrder = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('order');
+  const [expanded, setExpanded] = useState<string | null>(requestedOrder);
 
-  // For this prototype, all orders are shown as "My Orders".
   const myOrders = [...orders].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );

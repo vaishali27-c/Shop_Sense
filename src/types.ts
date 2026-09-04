@@ -50,7 +50,7 @@ export interface Address {
   isDefault: boolean;
 }
 
-export type OrderStatus = 'Placed' | 'Confirmed' | 'Shipped' | 'Delivered';
+export type OrderStatus = 'Placed' | 'Confirmed' | 'Processing' | 'Shipped' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
 
 export interface OrderItem {
   productId: string;
@@ -85,5 +85,13 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   products?: Pick<Product, 'id' | 'name' | 'price' | 'image' | 'rating' | 'stock'>[];
+  orders?: Array<{
+    orderId: string;
+    orderDate: string;
+    items: Array<{ productId: string; name: string; quantity: number; price: number; image: string }>;
+    totalAmount: number;
+    status: string;
+    paymentMethod: string;
+  }>;
   createdAt: string;
 }

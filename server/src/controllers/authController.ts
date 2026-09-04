@@ -3,9 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserModel } from '../models/User';
 import { authCookieOptions, clearAuthCookieOptions } from '../config/cookies';
+import { requireJwtSecret } from '../config/jwt';
 
 function userSecret(): string {
-  return process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
+  return requireJwtSecret('JWT_USER_SECRET');
 }
 
 export async function register(req: Request, res: Response): Promise<void> {

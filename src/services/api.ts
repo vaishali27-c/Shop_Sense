@@ -74,7 +74,7 @@ export type ApiOrder = {
   }>;
   totalAmount: number;
   orderDate: string;
-  status: 'Placed' | 'Confirmed' | 'Shipped' | 'Delivered';
+  status: 'Placed' | 'Confirmed' | 'Processing' | 'Shipped' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
 };
 
 export async function getProducts(): Promise<ApiProduct[]> {

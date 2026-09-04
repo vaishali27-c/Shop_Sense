@@ -39,7 +39,7 @@ export interface IOrder extends Document {
   items: IOrderItem[];
   totalAmount: number;
   orderDate: Date;
-  status: 'Placed' | 'Confirmed' | 'Shipped' | 'Delivered';
+  status: 'Placed' | 'Confirmed' | 'Processing' | 'Shipped' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
 }
 
 const OrderItemSchema = new Schema<IOrderItem>(
@@ -91,7 +91,7 @@ const OrderSchema = new Schema<IOrder>(
     orderDate: { type: Date, required: true, default: Date.now },
     status: {
       type: String,
-      enum: ['Placed', 'Confirmed', 'Shipped', 'Delivered'],
+      enum: ['Placed', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'],
       default: 'Placed',
     },
   },

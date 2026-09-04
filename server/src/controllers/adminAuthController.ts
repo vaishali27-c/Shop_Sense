@@ -3,9 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AdminModel } from '../models/Admin';
 import { authCookieOptions, clearAuthCookieOptions } from '../config/cookies';
+import { requireJwtSecret } from '../config/jwt';
 
 function adminSecret(): string {
-  return process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+  return requireJwtSecret('JWT_ADMIN_SECRET');
 }
 
 export async function adminLogin(req: Request, res: Response): Promise<void> {

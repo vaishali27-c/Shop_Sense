@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { OrderModel } from '../models/Order';
 
 interface ProductCatalogItem {
   id: string;
@@ -22,20 +23,53 @@ interface ProductCatalogItem {
 export interface GeminiShoppingResult {
   content: string;
   productIds: string[];
+  orders?: OrderSummary[];
+}
+
+export interface OrderSummary {
+  orderId: string;
+  orderDate: string;
+  items: Array<{ productId: string; name: string; quantity: number; price: number; image: string }>;
+  totalAmount: number;
+  status: string;
+  paymentMethod: string;
 }
 
 const SHOPPING_ONLY_MESSAGE =
-  "I'm designed to help with shopping and product-related questions. Please ask me about products, prices, ratings, recommendations, or stock.";
+  "Hi! 👋 Welcome to ShopSense. I can help you find products, compare options, check stock, track your orders, or help with your shopping. What are you looking for?";
+
+function normalizeQuery(query: string): string {
+  return query
+    .toLowerCase()
+    .replace(/₹/g, ' rupee ')
+    .replace(/rs\.?/g, ' rupee ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isGreetingQuery(query: string): boolean {
+  const normalized = normalizeQuery(query);
+  const greetings = [
+    'hi', 'hii', 'hey', 'hello', 'good morning', 'good evening', 'thanks', 'thank you', 'thanksss',
+    'hello assistant', 'hi there', 'hii there', 'heyy', 'bye', 'good night'
+  ];
+  return greetings.some((entry) => normalized.includes(entry) || normalized === entry);
+}
+
+function isHelpQuery(query: string): boolean {
+  const normalized = normalizeQuery(query);
+  return /what can you do|how can you help|help|capabilities/.test(normalized);
+}
 
 function isShoppingRelatedQuery(query: string): boolean {
-  const normalized = query.toLowerCase();
+  const normalized = normalizeQuery(query);
   const words = new Set(normalized.match(/[a-z0-9]+/g) ?? []);
 
   const shoppingKeywords = [
     'product', 'products', 'buy', 'purchase', 'recommend', 'recommendation', 'compare', 'comparison',
     'price', 'prices', 'cost', 'budget', 'under', 'over', 'rating', 'ratings', 'stock', 'available',
     'inventory', 'category', 'categories', 'shopping', 'shop', 'find', 'best', 'top', 'cheapest',
-    'affordable', 'deal', 'offers',
+    'affordable', 'deal', 'offers', 'search', 'looking for', 'need', 'want'
   ];
 
   const specificProductTerms = [
@@ -44,9 +78,9 @@ function isShoppingRelatedQuery(query: string): boolean {
     'shoe', 'shoes', 'bag', 'bags', 'jacket', 'hoodie', 'sneaker', 'sneakers', 'gadget', 'electronics',
   ];
 
-  const hasShoppingKeyword = shoppingKeywords.some((keyword) => words.has(keyword));
-  const hasProductTerm = specificProductTerms.some((term) => words.has(term));
-  const hasShoppingPhrase = ['for a gift', 'use case', 'look for', 'looking for']
+  const hasShoppingKeyword = shoppingKeywords.some((keyword) => normalized.includes(keyword) || words.has(keyword));
+  const hasProductTerm = specificProductTerms.some((term) => words.has(term) || normalized.includes(term));
+  const hasShoppingPhrase = ['for a gift', 'use case', 'look for', 'looking for', 'for college', 'for coding']
     .some((phrase) => normalized.includes(phrase));
 
   return hasShoppingKeyword || hasProductTerm || hasShoppingPhrase;
@@ -119,6 +153,7 @@ function parseGeminiResponse(rawText: string, catalog: ProductCatalogItem[]): Ge
 export async function askGeminiShoppingAssistant(
   query: string,
   products: unknown[],
+  userId?: string,
 ): Promise<GeminiShoppingResult> {
   const trimmedQuery = query.trim();
 
@@ -128,6 +163,22 @@ export async function askGeminiShoppingAssistant(
       productIds: [],
     };
   }
+
+  if (isGreetingQuery(trimmedQuery)) {
+    return {
+      content: "Hi! 👋 I'm your ShopSense assistant. I can help you find products, compare options, check stock, manage your cart, or track your orders.",
+      productIds: [],
+    };
+  }
+
+  if (isHelpQuery(trimmedQuery)) {
+    return {
+      content: 'I can help with products, recommendations, comparisons, stock, your cart, and order tracking. What would you like to do?',
+      productIds: [],
+    };
+  }
+
+  if (isOrderQuery(trimmedQuery)) return answerOrderQuery(trimmedQuery, userId);
 
   if (!isShoppingRelatedQuery(trimmedQuery)) {
     return {
@@ -203,5 +254,36 @@ ${JSON.stringify(catalog, null, 2)}
   } catch (error) {
     console.error('[Gemini Shopping Assistant]', error);
     throw new Error('Gemini shopping assistant failed');
+  }
+}
+
+export function isOrderQuery(query: string): boolean {
+  const hasOrderTerm = /\b(order|orders|purchase|purchased|bought|delivery|delivered|shipped|arrive|tracking|track|paid|item)\b/i.test(query);
+  const hasOrderIntent = /\b(my|mine|latest|recent|what|where|when|status|show|did|has|is|in)\b/i.test(query);
+  const hasPurchaseHistoryPhrase = /\b(what|which)\s+products?\s+did\s+i\s+buy\b|\bwhat did i buy in that order\b|\bhow much did i pay\b|\bwhat is the item\b|\bmy purchases\b/i.test(query);
+  return (hasOrderTerm && hasOrderIntent) || hasPurchaseHistoryPhrase;
+}
+
+function wantsOrderList(query: string): boolean {
+  return /show|list|all|orders|recent purchase|what did i (buy|order|purchase)/i.test(query);
+}
+
+function toOrderSummary(order: { orderId: string; orderDate: Date; items: Array<{ productId: string; name: string; quantity: number; price: number; image: string }>; totalAmount: number; status: string; paymentMethod: string }): OrderSummary {
+  return { orderId: order.orderId, orderDate: new Date(order.orderDate).toISOString(), items: order.items, totalAmount: order.totalAmount, status: order.status, paymentMethod: order.paymentMethod };
+}
+
+export async function answerOrderQuery(query: string, userId?: string): Promise<GeminiShoppingResult> {
+  if (!userId) return { content: "I can help you check your orders, but you'll need to log in first.", productIds: [] };
+  if (!process.env.MONGODB_URI) return { content: "I'm unable to retrieve your orders right now. Please try again.", productIds: [] };
+  try {
+    const found = await OrderModel.find({ userId }).sort({ orderDate: -1 }).limit(wantsOrderList(query) ? 20 : 5).lean();
+    const orders = found.map(toOrderSummary);
+    if (orders.length === 0) return { content: "I couldn't find any orders on your account yet.", productIds: [], orders: [] };
+    const latest = orders[0];
+    if (!wantsOrderList(query)) return { content: `Your latest order is currently ${latest.status}.\n\nOrder: ${latest.orderId}\nItem: ${latest.items.map((item) => `${item.name} ×${item.quantity}`).join(', ')}\nTotal: ₹${latest.totalAmount.toLocaleString('en-IN')}\n\nI'll show you the order details below.`, productIds: [], orders: [latest] };
+    return { content: `Here are your recent orders${orders.length > 1 ? ` (${orders.length})` : ''}:`, productIds: [], orders };
+  } catch (error) {
+    console.error('[Order Assistant]', error);
+    return { content: "I'm unable to retrieve your orders right now. Please try again.", productIds: [] };
   }
 }

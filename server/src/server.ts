@@ -12,12 +12,20 @@ import { ProductModel } from './models/Product';
 import { OrderModel } from './models/Order';
 import { syncAllInventory } from './services/inventoryService';
 import { fallbackProducts, fallbackOrders } from './services/fallbackData';
+import { assertJwtSecretsConfigured } from './config/jwt';
 
 const rootEnv = path.resolve(process.cwd(), '.env');
 const parentEnv = path.resolve(process.cwd(), '..', '.env');
 
 dotenv.config({ path: rootEnv });
 dotenv.config({ path: parentEnv });
+
+try {
+  assertJwtSecretsConfigured();
+} catch (error) {
+  console.error(`[ShopSense API] ${error instanceof Error ? error.message : 'JWT secrets are not configured'}`);
+  process.exit(1);
+}
 
 const app = express();
 const port = Number(process.env.PORT ?? 10000);

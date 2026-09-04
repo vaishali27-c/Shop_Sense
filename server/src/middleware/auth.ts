@@ -2,13 +2,14 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { AdminModel } from '../models/Admin';
+import { requireJwtSecret } from '../config/jwt';
 
 function userSecret(): string {
-  return process.env.JWT_USER_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-user-secret';
+  return requireJwtSecret('JWT_USER_SECRET');
 }
 
 function adminSecret(): string {
-  return process.env.JWT_ADMIN_SECRET ?? process.env.JWT_SECRET ?? 'shopsense-admin-secret';
+  return requireJwtSecret('JWT_ADMIN_SECRET');
 }
 
 declare global {

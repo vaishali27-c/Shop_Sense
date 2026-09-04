@@ -8,12 +8,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { formatINR, formatDateTime } from '@/lib/inventory';
 import type { OrderStatus } from '@/types';
 
-const STATUSES: OrderStatus[] = ['Placed', 'Confirmed', 'Shipped', 'Delivered'];
+const STATUSES: OrderStatus[] = ['Placed', 'Confirmed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'];
 const STATUS_TONE: Record<OrderStatus, 'neutral' | 'info' | 'warning' | 'success'> = {
   Placed: 'neutral',
   Confirmed: 'info',
+  Processing: 'info',
   Shipped: 'warning',
+  'Out for Delivery': 'warning',
   Delivered: 'success',
+  Cancelled: 'warning',
 };
 
 export function OrderManagement() {

@@ -31,7 +31,7 @@ async function run() {
 
   assert.deepEqual(result, {
     content:
-      "I'm designed to help with shopping and product-related questions. Please ask me about products, prices, ratings, recommendations, or stock.",
+      'Hi! 👋 Welcome to ShopSense. I can help you find products, compare options, check stock, track your orders, or help with your shopping. What are you looking for?',
     productIds: [],
   });
 
